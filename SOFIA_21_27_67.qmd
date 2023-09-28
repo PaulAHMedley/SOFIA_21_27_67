@@ -1,0 +1,27 @@
+---
+title: "SOFIA Major Fishing Area 21"
+---
+
+```{r setup, include=FALSE}
+
+library("remotes")
+library("here")
+# install_github("DanOvando/sraplus")
+# install.packages("TAF")
+# install_github("sofia-taf/SOFIA")
+library("sraplus")
+library("TAF")
+library("SOFIA")
+```
+
+
+
+
+
+## Summary
+
+
+
+```{r}
+
+```

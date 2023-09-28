@@ -1,0 +1,1067 @@
+---
+title: "Northeast Atlantic"
+subtitle: "SOFIA Major Fishing Area 27"
+author: "Paul A Medley"
+date: "September 2023"
+toc: true
+number-sections: true
+editor: source
+format:
+  docx:
+    reference-doc: FAO-format-doc.docx
+execute:
+  echo: false
+  warning: false
+  fig-dpi: 400
+---
+
+
+```{r setup}
+#| include: false
+# Note that for the current version of Quarto 1.3.450 table captions and referencing does not work. 
+# The tables themselves are rendered OK.
+library("here")
+system2("powershell", args=c("Set-Content", "-Path", paste0(here(),"\\.Rproj.user"), "-Stream", "com.dropbox.ignored", "-Value", "1"))  # for dropbox users with RStudio projects only
+#library("remotes")
+#install_github("DanOvando/sraplus")
+#install.packages("TAF")
+#install_github("sofia-taf/SOFIA")
+library("sraplus")
+library("TAF")
+library("SOFIA")
+#library("officedown")  #possible use
+#library("officer")
+library("readxl")
+library("dplyr")
+library("tidyr")
+library("flextable")
+library("purrr")    # map, map_lgl, safely
+source(here("R", "SOFIA_function_library.R"))
+
+options(dplyr.summarise.inform=FALSE)
+
+SRA_res <- tibble()
+
+# Parameters
+area <- 27
+THISYEAR <- "2023"
+```
+
+
+
+```{r}
+#| include: false
+#| output: false
+# Stock assessment summary
+
+SA_df <- readxl::read_xlsx(path=here("data", "ICES_SA_27.xlsx"), paste0("ICES_SA_", THISYEAR)) |>
+  dplyr::select(ISSCAAP = `ISSCAAP Group`, `FAO Area`, `Stock ID`, `Stock Name`,	
+                `Scientific Name`,	`Common Name`, `Stock Area`, 
+                `Assessment Year`,	Citation, 
+                Weight_Type,	Weight,	Status, Score, Category, Notes) |>
+  mutate(score_wt = Weight*Score)
+
+if (any(is.na(SA_df$Score) & SA_df$Status == "U")) {
+  filter(SA_df, is.na(Score), Status != "U")
+}
+```
+
+
+```{r}
+#| include: false
+#| output: false
+# FishStat total catch data
+
+df <- read.csv(file=here("data", "FishStat", "Capture_Quantity.csv"))
+country_df <- read.csv(file=here("data", "FishStat", "CL_FI_COUNTRY_GROUPS.csv"))
+species_df <- read.csv(file=here("data", "FishStat", "CL_FI_SPECIES_GROUPS.csv"))
+area_df <- read.csv(file=here("data", "FishStat", "CL_FI_WATERAREA_GROUPS.csv"))
+symbol_df <- read.csv(file=here("data", "FishStat", "CL_FI_SYMBOL.csv"))
+unit_df <- read.csv(file=here("data", "FishStat", "FSJ_UNIT.csv"))
+
+tc_df <- df |> filter(AREA.CODE==area) |>
+  arrange(PERIOD) |>
+  left_join(species_df, by=c("SPECIES.ALPHA_3_CODE"="X3A_Code")) |> 
+  dplyr::select(SPECIES.ALPHA_3_CODE:STATUS, Scientific_Name,
+                Name_En, Major_Group, 
+                ISSCAAP=ISSCAAP_Group_En)
+Last_Year <- max(tc_df$PERIOD)
+
+average_catch <- sum(filter(tc_df, MEASURE == "Q_tlw",
+                            (Major_Group %in% c("PISCES", "CRUSTACEA", "MOLLUSCA")),
+                            PERIOD > Last_Year-5)$VALUE)/5000000
+
+# 23-Salmons, trouts, smelts
+# 31-Flounders, halibuts, soles
+# 32-Cods, hakes, haddocks
+# 33-Miscellaneous coastal fishes
+# 34-Miscellaneous demersal fishes
+# 35-Herrings, sardines, anchovies
+# 37-Miscellaneous pelagic fishes
+# 43-Lobsters, spiny-rock lobsters
+# 45-Shrimps, prawns
+
+main_ISSCAAP <- c(
+  "Cods, hakes, haddocks", "Flounders, halibuts, soles",
+  "Salmons, trouts, smelts", "Miscellaneous coastal fishes",
+  "Miscellaneous demersal fishes", "Herrings, sardines, anchovies", 
+  "Miscellaneous pelagic fishes", "Lobsters, spiny-rock lobsters", 
+  "Shrimps, prawns", "Others")
+secondary_ISSCAAP <- ""
+# secondary_ISSCAAP <- c("Crabs, sea-spiders", 
+#                        "Squids, cuttlefishes, octopuses",
+#                        "Sea-urchins and other echinoderms", 
+#                        "Salmons, trouts, smelts")
+
+rm(df, country_df, species_df, area_df, symbol_df, unit_df)
+```
+
+  
+
+```{r eval=FALSE}
+##| include: false
+#| label: tbl-ISSCAAP_total_landings
+#| tbl-cap: "Total landings by ISCCAAP group for the entire period 1950-2021."
+
+tc_df |>
+  dplyr::group_by(ISSCAAP, MEASURE) |>
+  summarise(VALUE=sum(VALUE)) |>
+  select(ISSCAAP, VALUE, MEASURE) |>
+  arrange(desc(MEASURE), desc(VALUE)) |>
+  flextable() |>
+  autofit()
+```
+
+
+# Summary
+
+Most stocks in Area 27 are obtain their scientific advice from ICES, in many cases for stocks shared among member states. Most stocks are assessed on a regular 1-3 year cycle. Overall management has kept catches stable across all stocks. Most of these stocks are either fully fished (F) or overexploited (O), with some overexploitation detected within each ISSCAAP group (@tbl-ISSCAAP_avg_scores).  
+
+The high levels of exploitation are not surprising given the proximity of this area to Europe and industrial and technologically sophisticated fisheries from the early 1900s. Mechanized trawls in the North Sea and in the north Atlantic have been in operation for many decades, and the resources experienced extreme fishing pressures in the late 1970s and early 1980s. Since then, countries have decreased fishing pressure allowing many stocks to rebuild. For example, Atlantic mackerel, North Sea turbot, North Sea plaice, Bristol Channel/Celtic Sea sole, western English Channel sole, Arctic cod and Icelandic cod recovered in early to late 2000s, and North Sea/eastern English Channel whiting, North Sea sole and West of Scotland whiting recovered recently in the late 2010s. However, while improvements in status have been observed, they have been hampered by the nature of the mixed fisheries operating in many areas. Both western English Channel/southern Celtic Seas whiting and cod stocks have dipped back down becoming overexploited in the last few years, whereas Irish Sea whiting, West of Scotland cod and the iconic North Sea cod stocks have not recovered since being depleted in the 1990s. North Sea cod has unfortunately declined sharply in the last few years after many years rebuilding, although in the last couple of years biomass has again shown a positive trend.  
+
+  
+
+```{r}
+#| label: tbl-ISSCAAP_avg_scores
+#| tbl-cap: "Summary status across stocks by ISSCAAP based on scores (1=O, 2=F, 3=N) weighted by MSY (or a proxy for MSY) for stocks where status information is available."
+#| tbl-cap-location: top
+
+table_ISSCAAP_scores()
+```
+
+  
+  
+# Introduction {#sec-introduction}
+
+The total area of the Northeast Atlantic is 14.3 million km^2^, of which 2.7 million km^2^ are continental shelf area. The main oceanographic features are a subpolar and a subtropical gyre, which are driven predominantly by the North Atlantic current originating from the Caribbean, extended shelf area off Northern Europe, the semi-enclosed Baltic Sea, and the summer upwellings off the coast of Spain and Portugal (@fig-Area27Map).  
+
+The fisheries of the Northeast Atlantic expanded rapidly in the late nineteenth and early twentieth century as fishing became increasingly industrial and applied more advanced technology. This expansion was only interrupted by World Wars I and II which provided periods of little fishing activity during which stocks rebuilt. Since the 1950s, the Northeast Atlantic has shown a significant reduction in numbers of vessels and employment, but with a corresponding increase in fishing power of vessels, so fishing mortality continued to increase in many fisheries until the 21st Century. More recently, there is evidence that fishing has decreased in many ecoregions, primarily in demersal fisheries. 
+
+
+
+
+![The Northeast Atlantic (Area 21)](MapArea27.png){#fig-Area27Map}
+
+
+# Estimating Stock Status  
+
+The International Council for the Exploration of the Sea (ICES) is a network of 5000 experts from 700 institutes and organizations primarily in the 20 member countries. 1500 experts participate in its activities annually. ICES provides scientific advice for fisheries in the North-East Atlantic through its sole competent body, the Advisory Committee (ACOM). This Committee oversees the production of scientific advice for the management of coastal and ocean resources, and ecosystems on behalf of the Council. Scientific research is coordinated with ACOM through the Science Committee (SciCOM). The scientific advice is based upon the scientific analyses prepared in the ICES expert groups, which are subject to peer review. The ACOM advice is used by the relevant management authorities, which include government institutions, particularly the European Commission, and multilateral organisations, notably the Northeast Atlantic Fisheries Commission.  
+
+ICES has a fairly broad remit to not only provide specific advice on fisheries management, but also wider issues related to ecosystem science including improvements in the understanding of the structure, function, and dynamics of marine ecosystems, and the impacts of general human activities on ecosystems and ecosystem services.  
+
+The resource status described here is based primarily upon the 2022 and 2023 advice. The advice and other information, such as working group reports, are published on the ICES website (www.ices.dk). ICES provided advice on more than 206 stocks in 2022 and 2023. Most larger stocks are assessed annually using age structured stock assessments. For most others, the advice is constrained to suggesting limits on catches and identifying further information that is required for more precise recommendations for management measures. Lack of data, or unreliable data, are the greatest constraints on the precision and accuracy of assessments. For several stocks, catches have been misreported, and many lack a reliable abundance index to apply standard assessment techniques.  
+
+The default ICES approach to providing advice attempts to integrate the precautionary approach with the objective of achieving maximum sustainable yield (MSY) (Annex 2 of the UN Fish Stocks Agreement (UN, 1995)), unless otherwise requested. ICES interpretation of MSY is maximizing the average long-term yield from a given fish stock while maintaining the stock as productive. However, ICES considers that the MSY reference points it uses to be valid only in the short and medium term (generally up to 5–10 years), because of unknowable longer-term changes that are occurring, such climate change. As a result, ICES does not generally measure stock status against some inferred unexploited state. Rather, advice is generally focused on fishing mortality or harvest rate that should maximise long term yield, while setting a lower limit on spawning stock biomass above which no decline in recruitment is expected (or detectable).
+While the above estimation of fishing mortality and biomass reference points is highly desirable, it is not always possible. Therefore, ICES has procedures that cope with situations where information are lacking to still support advice. To this end, ICES classifies stocks into six categories on the basis of available knowledge and data (@tbl-ISSCAAP_category_summary):  
+
+•	Category 1 – Stocks with quantitative assessments. Includes stocks with full analytical assessments and forecasts that are either age-/length-structured or based on production models.
+
+•	Category 2 – Stocks with analytical assessments and forecasts that are only treated qualitatively. Includes stocks with quantitative assessments and forecasts which, for a variety of reasons, are considered indicative of trends in fishing mortality, recruitment, and biomass.
+
+•	Category 3 – Stocks for which survey-based assessments or exploratory assessments indicate trends. Includes stocks for which survey, trends-based assessment, or other indices are available that provide reliable indications of trends in stock metrics such as total mortality, recruitment, and biomass.
+
+•	Category 4 – Mostly *Nephrops* stocks where information on possible abundance can be inferred and stocks for which a reliable time-series of catch can be used to approximate MSY. This is where there are reasonable scientific grounds to use life-history and density information from functional units to provide advice.
+
+•	Category 5 – Stocks for which either only data on landings or a short time-series of catch are available.
+
+•	Category 6 – Stocks for which there are negligible landings and stocks caught in minor amounts as bycatch. Includes stocks where landings are negligible in comparison to discards as well as stocks that are primarily caught as bycatch species in other targeted fisheries.
+
+The main purpose is to apply an appropriate advice rule for fishing opportunities, primarily estimating the Total Allowable Catch. In general, the categories define how the advice on catches is applied. For categories 1 and 2, MSY based catches can generally be provided, whereas categories 3-6 apply relative advice, so catches are advised as relative changes on past catches that have been reported.  
+
+Not all stocks, species and populations are included in this evaluation. Which fish populations are considered each year will vary, although the most important “pressure” stocks, such as many of the Atlantic cod stocks, will be assessed each year, those stocks for which there is little data and which are bycatch, so there is no attempt to optimize their harvest, and they may only be assessed more rarely. Therefore, the 206 stocks considered here is close to, but below the total number that have been evaluated by ICES.  
+
+Within territorial waters, many fisheries are managed through local systems, which will not necessary be based on a stock assessment. In most cases, these do not get advice from ICES. For example, shellfish such as oysters, mussels, cockles and clams are primarily managed through area-based management that limits the take based on traditional access arrangements or operates using habitat enhancement such as ropes. For these stocks, there may be no traditional stock assessments, but surveys may be carried out annually that collect abundance data on those stocks. There is little attempt to optimise these fisheries in the sense of harvesting them at MSY, for example. Rather, the aim is to maintain the fisheries by applying limits that sustain the fishery. Although landings from such inshore stocks may not be particularly large, quantities are still considerable and important for local fishing communities.
+Some inshore stocks may have stock assessments conducted which are not accessible or published. This may be driven by sustainability certification requirements (such as the Marine Stewardship Council) and funded by the fishing industry. For example, the UK Wash Brown Shrimp (*Crangon crangon*) fishery (washshrimp.co.uk) falls into this category. These stocks have not been consistently assessed and represent relatively small landings, so have been excluded. However, it is possible in future that smaller inshore stocks could be included if assessments are published.  
+
+The number of stocks that are being evaluated by ICES has been increasing. This expansion has been occurring for two reasons. Firstly, data and analyses are improving and becoming more efficient, so more stock assessments and evaluations can be completed.  Secondly fisheries management is considering wider impacts of fishing on the ecosystems, which requires considering wider numbers of species, even if they do not make up a significant proportion of the value of the catch or are discarded dead.  
+
+As a result of the above, of the 206 stocks that have been evaluated, status can generally be defined for Category 1 and 2 stocks based on the advice. In many cases, relative status to MSY can be inferred for the other category stocks. The following process was applied.
+Where spawning stock biomass was reported relative to MSY (Category 1 & 2), if the stock was determined as significantly below the MSY point or below the limit reference point (if that point was available) the stock was determined as overfished. If around the MSY point, it was determined as fully exploited, and if well above the MSY point, not fully exploited. The 20% and 60% rule were used where they could be applied, but as stated above, results are not reported including a stock-recruit relationship, so this could only be inferred.
+For all other stocks, the general status could often be derived from information that was reported. If the stock biomass was, for example, reported as above any candidate MSY reference points, it could be inferred that the stock was either fully or not-fully exploited. Furthermore, the general status could be inferred from the catches, where catches had been low for at least generations or where fishing mortality had been below the MSY level, even if this was not precisely estimated. As a result, only 27 out of 206 stock evaluations provided insufficient information for status (Table 3), although these are often small stocks, many being predominantly bycatch in fisheries targeting other species.  
+
+The number of stocks being assessed has increased compared to 2021 from 192 to 206. There has been a general trend to assess more stocks as more data have become available, assessment methods have improved and assessments for high priority stocks have matured freeing up working group time for other stocks.  A number of stocks have also changed category, with stocks generally moving towards categories giving more precise estimates of stock status. For example, the number of Category 1 stocks has increased from 103 in 2021 to 110 in 2023.  
+
+  
+
+```{r}
+#| label: tbl-ISSCAAP_category_summary
+#| tbl-cap: "Stock category summary from (1) indicating full age-structured stock assessment, (3) index based assessment through to (5) being heuristic assessments based primarily on expert judgement (see above)."
+#| tbl-cap-location: top
+
+table_ISSCAAP_category()
+print("\n")
+```
+
+# Resource Status  
+## Overview  
+
+Total marine captures have increased from an average of around 6 million tonnes in the 1950s to an average of around 11 million tonnes during the period 1970-2000. Total marine captures have fallen to between 8 and 10 million tonnes since 2005 (@fig-ann_catch_27).  
+
+Within the total marine captures, the composition has changed. Overall, declines in fisheries for traditional species, such as North Atlantic cod (*Gadus morhua*), haddock (*Melanogrammus aeglefinus*) and herring (*Clupea harengus*), have been compensated by the development of fisheries for formerly lower-valued species such as blue whiting (*Micromesistius poutassou*). In addition, some stocks which have previously been depleted have recovered.  
+
+Most of the traditional fishery resources of the Northeast Atlantic are fully or over exploited (@tbl-ISSCAAP_status_summary). There have been notable improvements in the status of some larger stocks, such as Northeast Arctic cod, Northeast Arctic haddock, mackerel, and the larger herring stocks. Other stocks, such as North Sea cod, are still in recovery, made more difficult by the nature of the mixed demersal fisheries operating in the North Sea.  
+
+  
+
+```{r}
+#| label: fig-ann_catch_27
+#| fig-cap: "Annual nominal landings (million t) by ISSCAAP species groups in the Northeast Atlantic (Area 27)."
+#| width: 20cm
+
+plot_total_ISSCAAP()
+
+```
+
+  
+
+```{r}
+#| label: tbl-ISSCAAP_status_summary
+#| tbl-cap: "Stock status summary for not fully exploited (N), fully exploited (F), overfished (O) and unknown status (U). 'O-F' implies stocks are a mixture of fully exploited and overfished."
+#| tbl-cap-location: top
+
+table_ISSCAAP_status()
+
+```
+
+  
+
+## 23-Salmons, trouts, smelts  
+
+Catches of salmons, trouts and smelts represent only a small proportion of landings in this area. Because the species are associated with fresh and brackish water, they are predominantly managed locally. The anadromous lifecycle makes these stocks particularly dependent on coastal and riverine habitat which are often impacted by population and human development. Therefore, fisheries may be contributing to management problems rather than be the sole concern. The broad status of European smelt and European whitefish populations is therefore unknown. Salmon populations, however, are monitored.  
+
+There are over 1500 rivers with salmon (Salmo salar) stocks in the North Atlantic Salmon Conservation Organization’s (NASCO) Northeast Atlantic Commission (NEAC) Area. Each river is managed separately as separated salmon populations. However, salmon is divided broadly into four stock complexes. The smaller Northern European (Scandinavia and Russia) 1 sea-winter (1SW) and multi-sea-winter (MSW) stock complex is considered to be fully exploited, but at full reproductive capacity. The larger Southern European (Ireland, UK and France) 1SW stock is considered to be at reduced reproductive capacity, and the Southern European MSW stock complex is considered to be at risk of reduced reproductive capacity (Table 4).  
+
+Although estimated exploitation rates have generally been decreasing over time for all stock complexes, there has been little improvement in the status of stocks. For the southern complex, exploitation is now less than 10% of the stock. Nevertheless, a significant proportion of populations are still suffering a reduced reproductive capacity in Ireland, Northern Ireland, England, and France. This is mainly because of continuing poor survival in the marine environment. In addition, hatchery reared smolts are often released to support populations and river habitat will also have an impact.  
+
+Baltic salmon and trout are assessed separately. The natural smolt production of salmon populations has continued to increase and is now about 70% of the overall potential wild production. However, in common with other salmon populations, survival of post-smolt fish has remained low, and has suppressed recovery of wild salmon stocks.  
+
+For Baltic trout, results with high recruitment in some areas. Catch reductions have been advised in some areas with low recruitment, but recovery will likely require habitat improvement. Overall, the stocks are at least fully exploited even though exploitation rates been reduced since 2001.  
+
+
+```{r}
+#| label: fig-ann_catch_27_23
+#| fig-cap: "ISSCAAP Group 23 annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 23-Salmons, trouts, smelts
+
+ISSCAAP <- "Salmons, trouts, smelts"
+retain_groups <- c("Atlantic salmon", "European smelt",
+                   "European whitefish", "Others",
+                   "Sea trout", "Vendace")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+
+```{r}
+#| label: tbl-23Stocks
+#| tbl-cap: "Salmons, trouts and smelts stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_23
+#| fig-cap: "ISSCAAP Group 23 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_23
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+
+
+## 31-Flounders, halibuts, soles
+
+Flatfish catches, primarily made up of plaice (*Pleuronectes platessa*) show a decline since 1990 primarily due to overfishing (@fig-ann_catch_27_31). Most stocks are now fully exploited, and catches have stabilised at a lower level (@tbl-31Stocks).  
+
+The majority of flatfish catches are taken in demersal trawl fisheries. Most demersal trawl fisheries are mixed fisheries, so they catch a variety of fish most of which are controlled by quota. This has led to significant discarding dead in the past. The small mesh fishery targeting sole has been responsible for significant discards of low value species, such as dab. Under the new EU landings obligation and discard bans applied by other countries, discarding has been reduced. Discards are still allowed under various exceptions, where unwanted bycatch capture has been minimised, and survival for the discard species is thought to be high (based on, for example, trawl duration). Discards are now also reported and so can be included in stock assessments.  
+
+Plaice and sole (*Solea solea*) are the major species in the North Sea mixed flatfish fishery. North Sea sole and plaice are classified as having full reproductive capacity and as being harvested sustainably. 
+
+In terms of value, Greenland halibut and turbot are valuable landings, and the assessments for those that have been carried out suggest that they are fully exploited.  
+
+Similarly, smaller stocks in other areas are generally at full exploitation, but are not overfished. Some smaller stocks have insufficient information to determine their status, so they are managed by precautionary harvest control rules based primarily on demersal survey data. In many cases, such as the West of Ireland sole stock, recent catches have been very low, so it is not unreasonable to suppose that they are currently only lightly exploited. However, without some indicator on fishing mortality (such as mean length), the status cannot be strictly determined so they have been classified as unknown.
+
+  
+
+```{r}
+#| label: fig-ann_catch_27_31
+#| fig-cap: "ISSCAAP Group 31 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 31-Flounders, halibuts, soles
+
+ISSCAAP <- "Flounders, halibuts, soles"
+retain_groups <- c("Common dab", "Common sole",
+                   "European flounder", "European plaice", 
+                   "Greenland halibut", "Lemon sole", 
+                   "Megrim", "Others", "Witch flounder")
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+
+
+```{r}
+#| label: tbl-31Stocks
+#| tbl-cap: "Flounders, halibuts and soles stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_31
+#| fig-cap: "ISSCAAP Group 31 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_31
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+## 32-Cods, hakes, haddocks
+
+Catches of Atlantic cod have consistently made the largest contribution to the total of cods, hakes and haddocks until 1998 when they were exceeded by blue whiting landings (@fig-ann_catch_27_32). A persistent downward trend in cod catches is evident from the peak in the late 1960s, although the lower catches in recent years can be attributed in part to the ongoing rebuilding programme for North Sea cod. Importantly, larger cod fisheries in Iceland and the Arctic (ICES Areas 1 and 2) have sustained high catches at full exploitation. Most other significant cod stocks are over-exploited and need to be rebuilt. Because they are caught in mixed fisheries, and because other environmental factors such as climate change may be affecting recruitment, rebuilding has proved difficult to achieve. A rebuilding plan for North Sea cod achieved some success from 2005-2017, but was ended prematurely and the spawning stock has returned to low levels in recent years, while rebuilding has begun again in recent years.  
+
+Western and eastern Baltic cod (subareas 22-24 and 25-32) appear over-exploited in 2009. Both stocks, but particularly the eastern Baltic cod, have been through periods of prolonged depletion. Western Baltic cod appears to be recovering, but Eastern Baltic cod may not be. In addition, the Baltic cod fishery has had considerable problems with monitoring and control, particularly underreporting of catches 1993-1996, and 2000-2007, and more recently Eastern Baltic cod has been impacted by environmental effects affecting growth and mortality. This makes assessments and management of this stock more difficult.  
+
+The cod stocks form most of the other major landings. West of Scotland, Irish Sea and Celtic Sea cod are considered to have reduced reproductive capacity. Only the status of Rockall cod remains unknown. Catches of the small Rockall stock appear to have declined without management intervention.  
+
+This region also includes the larger of the two hake stocks (Merluccius merluccius) in the Northeast Atlantic. The northern hake stock, which also extends into the North Sea, is at full reproductive capacity and is being harvested sustainably having recovered from an extended period of depletion around 1985-2010. The southern hake stock status is not so well defined, but indicators suggest that the stock has increased in size and precautionary catch limits are applied, such that the stock is highly likely to be fully exploited rather than overfished.  
+
+Cod is often caught with haddock and saithe. Haddock and saithe stocks are generally in a better state, and may get some protection from controls on cod catches.  
+
+Catches of blue whiting have been greater than those of cod since 1999 reaching a peak in 2004, but declining due to reduced recruitment and lower fishing mortality followed by a recovery to current exploitation level.  
+
+Blue whiting is caught from the Barents Sea to the Straits of Gibraltar. Based on the 2020 estimates of biomass and fishing mortality, the stock has full reproductive capacity, but recent harvest has been too high. Historically, 1980 to 1995 the stock was in poor condition, but since 1995 the stock has been fluctuating above the MSY level.  
+
+Catches of whiting and Norway pout have declined alongside cod. Whereas Norway pout is probably not overfished, whiting shows a mixed picture with some stocks having been heavily depleted. There is a directed fishery at Norway pout, but the stock size is highly variable from year to year, due to recruitment variability and a short life span. Because whiting is caught in mixed fisheries, reducing exploitation on whiting while maintain higher catches of other species has proved difficult. Whiting in the Irish Sea has been very heavily depleted, but low fishing mortality west of Scotland stock has achieved a recovery.  
+
+There are a number of deeper water species including grenadiers, tusk, pollack, blue ling and ling, for which catches have risen in recent decades as fishing activity has tried to diversify from cod and other pressure species. While none of these fisheries are particularly large, ling is the most substantial in the region of 20000t annually. The productivity of these stocks is often low even if the population sizes are initially large, making them vulnerable to overfishing. There has been limited data to determine the status of these species, but assessments have proceeded probably in response to concerns over their vulnerability. Where data do exist, they have not been determined as less than fully exploited with a couple of smaller stocks being overexploited. 
+
+There is no targeted fishery for polar cod (Boreogadus saida) and catches are low compared to the likely resource size of 1.2 million tonnes (Michalsen et al. 2013). The Barents Sea polar cod stock have been monitored annually by a joint Norwegian-Russian survey since 1986 (Michalsen at al. 2013), and the total stock biomass has varied widely in that period with no clear trend. It is likely that the stock will be affected by climate change (Huserbråten et al. 2019; Aune et al 2021). Polar cod, like capelin and sandeel, is an important prey for many arctic species and safe levels of exploitation may therefore be very low under an ecosystem approach.
+
+
+```{r}
+#| label: fig-ann_catch_27_32
+#| fig-cap: "ISSCAAP Group 32 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 32-Cods, hakes, haddocks
+
+ISSCAAP <- "Cods, hakes, haddocks"
+retain_groups <- c("Atlantic cod", "Blue whiting(=Poutassou)",
+                   "European hake", "Haddock", 
+                   "Ling", "Norway pout", 
+                   "Saithe(=Pollock)", "Whiting", "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-32Stocks
+#| tbl-cap: "Cods, hakes and haddocks stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_32
+#| fig-cap: "ISSCAAP Group 32 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_32
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+
+## 33-Miscellaneous coastal fishes
+
+Catches in terms of the small-mesh fishery for sandeels (ISSCAAP Group 33) has expanded substantially since the 1970s supplying the market for fishmeal. Catches 1985 – 2002 have shown no trend and have varied between 0.65 and 1.24 million tonnes (@fig-ann_catch_27_33). However, since 2002, sandeel catches have declined to below 500 thousand tonnes due to environmental change and responding management controls. 
+
+For the shorter-lived species (fished mainly for industrial purposes rather than human consumption), one sandeel stock (central and southern North Sea) is still considered at risk of reduced reproductive capacity, but is showing clear signs of recovery. Population sizes are strongly influenced by the environment. Temperature and salinity affect processes such as natural mortality and recruitment causing significant changes in population size even in the absence of fishing. In addition, sandeels are important prey species for several other fish stocks (cod, saithe, haddock, and mackerel), marine mammals and seabirds, so greater precaution has been advised.
+
+Other species include mullet, seabass and seabreams, which make up a much smaller proportion of landings, although these species are much more valuable and used directly for human consumption. In general, there is limited information about these stocks, but where data are available, they have been found to be fully or overexploited.  
+
+```{r}
+#| label: fig-ann_catch_27_33
+#| fig-cap: "ISSCAAP Group 33 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 33-Miscellaneous coastal fishes
+
+ISSCAAP <- "Miscellaneous coastal fishes"
+retain_groups <- c("Sandeels(=Sandlances) nei", 
+                   "Bogue", 
+                   "European seabass",  
+"Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+
+```{r}
+#| label: tbl-33Stocks
+#| tbl-cap: "Miscellaneous coastal fishes stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_33
+#| fig-cap: "ISSCAAP Group 33 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_33
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+## 34-Miscellaneous demersal fishes
+
+Stock assessments for anglerfish has improved over the years and their status is now reasonably well estimated. The catches for anglerfish are mixed and separation of angler and monkfish catches is generally difficult. Issues may be further complicated by detected hybridisation between *Lophius budegassa* and *L. piscatorius* (Aguirre-Sarabia et al. 2021).  
+
+Redfishes (*Sebastes* spp.) are generally vulnerable to overfishing having life history characteristics associated with low productivity given their current status, low productivity and the high fishing pressure in the region, the scientific recommendation generally for redfishes (*Sebastes norvegicus* and *S. mentella*) is to keep catches as low as possible. Catches have already been reduced significantly from the late 1990s (@fig-ann_catch_27_34). There are now seven stocks defined including separation by depth, with all but two designated as overfished.  
+
+The main greater silver smelt (*Argentina silus*) stocks are probably fully exploited with the exception of the East Greenland and Iceland grounds stock which appears now to be relatively lightly exploited. Around 10% of silver smelt catches are the lesser silver smelt (*Argentina sphyraena*), but the status of this species is not known.  
+
+Atlantic orange roughy (*Hoplostethus atlanticus*) is over exploited and ICES recommends that catches of this species should not avoided altogether. Landings are already very low, but given the longevity of the species, it could be many decades before stocks recover from past fishing.  
+
+A recent stock assessment has been completed for wolffish in Iceland grounds where it is widely caught and determined as fully exploited. For many demersals, Atlantic cod is the “choke” species.  Otherwise, demersal species caught alongside cod are unlikely to be less than fully exploited unless they can be shown to be less catchable, such as found predominantly outside the main fishing areas.
+
+
+```{r}
+#| label: fig-ann_catch_27_34
+#| fig-cap: "ISSCAAP Group 34 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 34-Miscellaneous demersal fishes
+
+ISSCAAP <- "Miscellaneous demersal fishes"
+retain_groups <- c("Angler(=Monk)", 
+                   "Argentines", 
+                   "Atlantic redfishes nei",
+                   "Atlantic wolffish",
+                   "Beaked redfish", "Boarfish", "Golden redfish", "Monkfishes nei",
+"Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-34Stocks
+#| tbl-cap: "Miscellaneous demersal fishes stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_34
+#| fig-cap: "ISSCAAP Group 34 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_34
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+## 35-Herrings, sardines, anchovies  
+
+Herring is a demersal spawner, so stock structure is generally complex. Populations may mix but spawn separately at different times of year and in different areas and where the seabed is predominantly gravel. For example, the main North Sea herring stock, autumn spawning North Sea herring, consists of a number of spawning components, landings from which cannot be separated and are therefore treated as a single stock. Herring may suffer from periods of poor recruitment which makes it vulnerable to overfishing if there is no proportionate management response. The largest populations Norwegian spring spawners and North Sea autumn spawners are fully exploited, but other populations in the Baltic and west of the UK are currently overexploited. West of Ireland and Scotland herring recently changed from overfished to fully exploited. There are some other small spring spawning herring stocks associated with gravel beds and river estuaries which are managed locally.  
+
+Sprat is fully exploited, and the stock has appeared stable over the last decade despite a trend in fishing mortality to above the precautionary level. The sprat population and the fishery are heavily affected by environmental effects, with interest in sprat being primarily during winter months. In addition, the recovery in the main predator, cod, may require a reassessment of management objectives for these stocks, however.  
+
+The sardine (*Sardina pilchardus*) fisheries, of which the Spanish and Portuguese fisheries are the largest by volume, and the anchovy (*Engraulis encrasicolus*) fisheries are relatively small in landings volume compared to other species. In common with many short-lived pelagic species, they are affected by environmental factors as well as fishing, and are currently fully harvested.
+
+  
+
+```{r}
+#| label: fig-ann_catch_27_35
+#| fig-cap: "ISSCAAP Group 35 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 34-Miscellaneous demersal fishes
+
+ISSCAAP <- "Herrings, sardines, anchovies"
+retain_groups <- c("Atlantic herring", 
+                   "European anchovy", 
+                   "European pilchard(=Sardine)",
+                   "European sprat",
+"Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-35Stocks
+#| tbl-cap: "Herrings, sardines and anchovies stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_35
+#| fig-cap: "ISSCAAP Group 35 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_35
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+
+## 37-Miscellaneous pelagic fishes
+
+Capelin (*Mallotus villosus*) is a short lived species strongly affected by environment changes, producing high short-term variability (@fig-ann_catch_27_37). Capelin catches were highest 1970-1985, fluctuated dramatically between 1985-2005, and have been at their lowest level during 2005-2009. Stock condition for capelin, an important prey item for many predators in the region including cod and haddock, is considered in good condition with catches remaining at or below sustainable limits. Setting precautionary catches have limited this fishery, and landings remain small compared to historical levels.
+
+Atlantic mackerel (*Scomber scombrus*) now makes the largest contribution to ISSCAAP Group 37, and after a dip in 2006 has returned to around the long-term average catch maintained since the mid-1970s. Atlantic mackerel is assessed as a single stock for the Northeast Atlantic, although it is made up of several spawning components. The spawning stock biomass (SSB) has increased from a low of 2.0 million tonnes in 2003 to around 3.7 million tonnes in 2019. This is despite catches considerably exceeding scientific advice, and the sustained levels of SSB in recent years has been the fortunate result of strong recruitment. Although the stock as a whole is at full reproductive capacity, the North Sea component is still depleted and catches in the North Sea are prohibited at appropriate times to encourage its recovery.
+
+Despite its current good status, the mackerel fishery has a number of problems. Catches have generally exceeded scientific advice, although they appear to be some convergence. Misreporting has also been a serious problem in this fishery, especially in international waters, although this problem too has been very much reduced in recent years. International management problems are partly due to the summer mackerel distribution extending further northwards in recent decades, so that the stock is being commercially fished in areas where it was previously not fished, particularly in the Icelandic EEZ.
+
+Horse mackerel (*Trachurus trachurus*) in the North Sea and more widely in the Northeast Atlantic are probably over-exploited, although the catches are significantly reduced and stocks may be recovering outside of the North Sea. Horse mackerel in Iberian waters is likely not yet fully exploited.
+
+
+```{r}
+#| label: fig-ann_catch_27_37
+#| fig-cap: "ISSCAAP Group 37 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 37-Miscellaneous pelagic fishes
+
+ISSCAAP <- "Miscellaneous pelagic fishes"
+retain_groups <- c("Atlantic chub mackerel",
+                   "Atlantic horse mackerel",
+                   "Atlantic mackerel", 
+                   "Atlantic pomfret",
+                   "Blue jack mackerel",
+                   "Capelin", "Jack and horse mackerels nei", "Mackerels nei",
+"Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-37Stocks
+#| tbl-cap: "Miscellaneous pelagic fishes stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_37
+#| fig-cap: "ISSCAAP Group 37 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_37
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+
+## 43-Lobsters, spiny-rock lobsters  
+
+Catches of lobsters (ISSCAAP Group 43), which includes the valuable Norway lobster fisheries,  have increased since the early 1950s, stabilising at current levels since the 1990s (@fig-ann_catch_27_43).  
+
+The Norway lobster (*Nephrops norvegicus*) are a resource that has increased in importance. *Nephrops* is managed primarily in “functional units” which are separate areas of the burrowed mud that the species inhabits. These units are primarily managed through monitoring the length and sex composition and conducting remote observation vehicle surveys to obtain hole density. These separate sources of information allow management to set sustainable harvest rates for each unit. On the whole, sustainable harvest rates are achieved by limiting access and controlling fishing activity rather than by specific TAC applied to each unit. Most units are fully exploited, while some show densities below target levels and may need rebuilding. There is generally insufficient information to determine status of populations outside these designated units.  
+
+European lobster represents only a small proportion of the catch volume, albeit they are important for small inshore fisheries. Generally, the stock status is not known, and they are managed through precautionary management interventions, mainly trap limits, minimum sizes and techniques like “v-notching”. However, these initiatives are usually promoted because it is often believed that these inshore populations are at risk of overexploitation.  
+
+  
+
+```{r}
+#| label: fig-ann_catch_27_43
+#| fig-cap: "ISSCAAP Group 43 Annual nominal catches (million t) of selected species in Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 43-Lobsters, spiny-rock lobsters
+
+ISSCAAP <- "Lobsters, spiny-rock lobsters"
+retain_groups <- c("European lobster",
+                   "Norway lobster", "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-43Stocks
+#| tbl-cap: "Lobsters and spiny-rock lobsters stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_43
+#| fig-cap: "ISSCAAP Group 43 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_43
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+
+## 45-Shrimps, prawns
+
+Landings in this group increased to mid-1980s, stabilised, then decreased 2000-2005 to current levels. Observed changes in landings are mostly attributable to northern prawn (*Pandalus borealis*).  
+
+Of the northern prawn stocks assessed by ICES, the majority appear not to be fully exploited. However, this probably represents a minority of stocks in the region. Iceland for example has 10 prawn management units, a single offshore stock and nine inshore stocks separated by fjords. Of the larger units that have been assessed, results suggest that they are fully to overexploited (DNV 2018), although many changes in these small stocks might be attributed to predation pressure from cod and haddock.  
+
+Common (brown) shrimp (*Crangon crangon*) tend to be taken in shallow coastal waters such as the Wadden See. Previous assessments have generally not indicated overfishing, and most concern has been with assessing and managing the relatively high bycatch in these fisheries. However, with the fishery achieving MSC certification, there is a work programme looking at improving fishery monitoring and harvest control rules in these fisheries (WGCRAN 2019). While the stocks fluctuate seasonally and are strongly affected by environmental factors, such as water temperature, they are important prey for juvenile cod and other species, so there is little room to increase exploitation. It might therefore be reasonable to consider these stocks as fully exploited.  
+
+Apart from Northern prawn and common shrimp, catches of other species are very low although they may support small local fisheries. For these stocks, the status is unknown.
+
+  
+
+```{r}
+#| label: fig-ann_catch_27_45
+#| fig-cap: "ISSCAAP Group 45 annual nominal catches (million t) in the Northeast Atlantic (Area 27). "
+#| width: 20cm
+
+# 45-Shrimps, prawns
+
+ISSCAAP <- "Shrimps, prawns"
+retain_groups <- c("Common prawn",
+                   "Common shrimp", 
+                   "Deep-water rose shrimp",
+                   "Northern prawn",
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-45Stocks
+#| tbl-cap: "Shrimps and prawns stock status in Area 27. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_area(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors27.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_27_45
+#| fig-cap: "ISSCAAP Group 45 Relative catches of selected species in Northeast Atlantic (Area 27). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_45
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+
+## Other Species  
+
+For the other species groups (@fig-ann_catch_27_other_ISSCAAP), stocks have generally not been routinely assessed by ICES. Landings include shell weight for molluscs.  
+
+Many species do not have a stock assessment. Many are managed based on area access and control. For some stocks, a survey is conducted regularly and a catch quota based on a fixed proportion of the estimated stock size. Bivalves are taken using dredges, or other active bottom set gear. This may impact seabed habitat and this is often a concern for long term management.  
+
+In some cases, stocks are enhanced. For example, mussels are often grown on ropes which are suspended in coastal water with high current flows. Classical stock status evaluations will not apply in these cases.  
+
+Most catches of crabs are from coastal areas. Trap fisheries for crabs include red king crab and snow crab (arctic), and brown crab (temperate). Status is not well defined, but stocks are generally thought to be at least fully exploited.  
+
+Sharks, rays and chimaeras tend to be taken as bycatch. For many sharks, there are significant concerns over their mortality level and they may be included in endangered, threatened and protected species lists. In these cases, the species are not targeted, and requirements are usually to release alive if at all possible.  
+
+While more assessments of these species could be attempted, this would create a significant demand on limited scientific resources. For bycatch species, it is presumed that management of pressure stocks, reducing fishing activity applies some protection to other species. It is notable that landings for most of these species groups, excepting scallops, squids/cuttlefish and crabs which are targeted fisheries, have declined significantly over the last 20 years, and this is approximately in line with declines in fishing mortality on demersal stocks during the same period.
+
+```{r}
+#| label: fig-ann_catch_27_other_ISSCAAP
+#| fig-cap: "Other ISSCAAP Groups’ annual nominal catches (million t) in the Northeast Atlantic (Area 27). " 
+#| width: 20cm
+
+retain_groups <- c("Sharks, rays, chimaeras", "Mussels", 
+                   "Clams, cockles, arkshells",
+                   "Scallops, pectens", "Squids, cuttlefishes, octopuses", 
+                   "Crabs, sea-spiders", "Abalones, winkles, conchs", "Others")
+  
+# Exclude "INVERTEBRATA AQUATICA" "PLANTAE AQUATICAE" "MAMMALIA" . Mammalia is counted. Seaweeds distorts weights.
+
+plot_others(retain_groups)
+```
+
+  
+# SRA Summary Results
+
+The SRA assessments used here are a naive catch-only assessment that does not use any other information.
+
+The priors might be improved. There is no fishlife match reported even when the species has life history parameters well estimated. This problem still needs to be resolved.
+
+The match between SRA and the stock assessments on a stock-by-stock basis is poor, but the general status of all stocks combined is better. SRA tends to imply more stocks are overfished, which is arguably more precautionary, although quite a few stocks are identified by SRA as "underfished" which are most likely full exploited. In many cases, the status of stocks is unknown both for SRA and stock assessments available to this review.  
+
+
+```{r}
+#| label: tbl-SRA_results_summary
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments overall."
+
+
+status_levels <- c("O", "O-F", "F", "N", "U")
+dummy_table <-  expand_grid(`SRA Status` = factor(status_levels), 
+                            `True Status`=factor(status_levels)) |>
+  mutate(count=0)
+
+res <- SRA_res |>
+  select(`SRA Status`, `True Status`) |>
+  replace_na(list(`True Status`="U")) |>
+  mutate(`SRA Status` = factor(`SRA Status`, levels = status_levels),
+         `True Status` = factor(`True Status`, levels = status_levels),
+         count = 1) |>
+  rbind(dummy_table) |>
+  group_by(`SRA Status`, `True Status`) |>
+  summarise(count = sum(count)) |>
+  ungroup()
+
+res |>
+  pivot_wider(names_from=`True Status`, values_from=count) |>
+  select(`SRA Status`, O, `O-F`, `F`, N, U) |>
+  flextable() |>
+  autofit()
+```
+
+
+```{r}
+#| label: tbl-SRA_results_summary2
+#| tbl-cap: "Marginal SRA status estimates compared to averaged stock assessments."
+
+rbind(
+  group_by(res, `SRA Status`) |>
+    summarise(count = sum(count)) |>
+    pivot_wider(names_from=`SRA Status`, values_from=count) |>
+    mutate(Source="SRA"),
+  group_by(res, `True Status`) |>
+    summarise(count = sum(count)) |>
+    pivot_wider(names_from=`True Status`, values_from=count) |>
+    mutate(Source="Stock Assessments")) |>
+  select(Source, everything()) |> 
+  flextable() |>
+  autofit()
+```
+
+
+
+
+# Notes on Environmental Issues
+
+ICES ecosystem overviews provide descriptions of the ecosystems and fisheries. In addition to biomass removal, ecosystem effects of fisheries include abrasion, ghost fishing, and bycatch of vulnerable species.  
+
+Bycatch problems include sharks and rays in demersal and pelagic fisheries, marine mammals, such as common dolphins in the western English Channel fisheries, and diving birds in a variety of coastal gillnet fisheries (Baltic cod, Icelandic lumpfish). How great these problems are depends upon the catchability of the species and the impact on population. This varies, but some species are critically endangered or made extinct in some areas due to fishing often compounded with other human induced mortality.  
+
+There is relatively high impact from mobile bottom-contacting gears in the southern areas of the Baltic Sea, the eastern English Channel, nearshore areas in the south-eastern North Sea, and in the central Skagerrak. This is mainly abrasion from otter trawls and beam trawls targeting demersal and benthic fish, although dredges targeting shellfish may well be a concern in many areas. The Azores ecoregion is a hotspot for cold-water corals, which may be impacted by bottom-set longline.  
+
+Many fisheries have exhibited a decline in fishing effort measured as fishing power over the last 20 years. This is the result of initiatives to reduce fishing capacity as well as improved fishing efficiency in attaining allowable catches. This should reduce all unintended impacts of fishing, including on bycatch and habitat, but there is no guarantee these impact reductions are sufficient to meet ecosystem objectives.  
+
+Climate change is causing changes in water masses and likely to have unforeseen impacts on fisheries including through changes in productivity and stock distribution. Effects could include recruitment failure or enhancement of different species and changes in natural mortality through disease and parasites. Changes in the incidence parasitic worms can affect the market and cost of processing products (e.g. cod worm). Changes in the distribution of stocks may impact management and socio-economics as traditional fisheries lose access when stock biomass shifts. As a result, climate change is likely to be an increasing consideration in fisheries management in future.
+
+In the Baltic, management is made more complex by the environmental effects due to freshwater inflows lowering salinity and oxygen levels, often with raised temperature and nutrients. A major period of ecological stress in the Baltic appears to have occurred between 1987 and 1993, when low salinity, low dissolved oxygen, high temperatures and high nutrient levels occurred alongside high cod fishing pressure which, it has been suggested, pushed the biotic part of the ecosystem into a new state, with reduced cod productivity (Diekmann and Möllmann 2010). The abundance of cod, being the main predator of sprat and herring, has an important effect on the whole Baltic ecosystem. More recently, declining cod condition has been linked to limited food availability as well as hypoxia and selective fishing pressure. Managing the stock to a fixed MSY level is unlikely to be possible.
+
+# Notes on Management Issues
+
+Many fisheries in the region are mixed, so a number of stocks are fished and landed at the same time. In most cases, there is a limiting stock. For example, in the North Sea it is cod, whereas in Iberian waters it is hake. This also means that management controls when implemented, may affect the status of a wide range of stocks, not only because of constraints on fishing opportunities, but also due to rationalisation of fleets to improve economic performance.  
+
+In terms of fisheries management performance, control over fisheries has shown a positive trend. For the Oceanic Northeast Atlantic, Greater North Sea, Celtic Seas and Baltic Seas ecoregions, there has been a general declining mean fishing mortality ratio (F/FMSY) for category 1 stocks over the last two decades, although in many cases the current fishing mortality remains higher than the target level. For pelagic stocks, fishing mortality has been fluctuating with no clear trend and has risen periodically above the MSY level. For the Norwegian Sea, Barents Sea, and Greenland Sea ecoregion overall fishing mortality has been more stable for both demersal and pelagic stocks. For Icelandic waters, larger demersal stocks show a clear reduction in fishing mortality across fisheries over the last decade, while smaller stocks show a stable or shallow increase over much of the same period with a recent decline to the target level based on management intervention for these species. For pelagics, the fishing mortality has also approached the target level for the main species. For the Azores ecoregion, there are no category 1 assessments.  
+
+Until the late 1970s/early 1980s the principal regional fisheries management organisation in the area was the Northeast Atlantic Fisheries Commission (NEAFC). However, the declaration of 200-mile EEZs and the establishment of the Common Fisheries Policy of the European Union resulted in a reduction in the area NEAFC is responsible for.  
+
+For fish stocks occurring exclusively within the jurisdiction of the coastal state, it is that state which manages the resource exploitation, and this applies to the majority of stocks in the region. 
+
+For states that are members of the European Union competence for fishery managements lies with the European Commission and is administered by DG MARE. Fisheries on stocks shared between Norway and Russia are managed through the Norwegian-Russian Fishery Commission. This means that the role of NEAFC is now largely confined to shared stocks that occur in international waters such as mackerel, blue whiting and redfish (@fig-NEAFCAreaMap).  
+
+NEAFC recommends and co-ordinates measures to maintain the rational exploitation of fish stocks in the Convention Area, using scientific advice from ICES. Measures are implemented by the contracting parties that include the European Union, as well as Denmark (in respect of the Faroe Islands and Greenland), Iceland, Norway, UK and Russia.  
+
+NEAFC not only harmonizes measures in the region, but coordinates the management of shared stocks, and perhaps most importantly, manages fisheries in international waters. If requested, NEAFC will also recommend measures for areas under national jurisdiction. In practice, NEAFC is primarily responsible for the blue whiting fishery. While significant catches from other stocks do occur in NEAFC waters, such as haddock and mackerel, these are also shared among coastal state EEZs, so NEAFC has a greater role in helping to co-ordinate management among these states.
+
+
+![NEAFC convention area (source: https://www.neafc.org/page/27)](NEAFC_Area.png){#fig-NEAFCAreaMap}
+
+
+Most fisheries are managed using stock-specific total allowable catches (TACs); therefore ICES is typically requested to provide catch advice on a stock by stock basis. However, other fishery management measures are frequently used as well, and advice is modified to take account of technical interactions (e.g. bycatch in mixed species fisheries) or of biological interactions (e.g., predator-prey) where appropriate.
+
+Currently, seven Regional Advisory Councils (RACs) were established after the revision of the EU Common Fisheries Policy in 2002 (EU 2004, 2007). The objective of the RACs is to work towards integrated and sustainable management of fisheries, based on the ecosystem and precautionary approaches. They provide a way for stakeholders to discuss issues and develop management plans.
+
+Another related and important ongoing development has been the implementation of testable, explicit and transparent harvest control rules or management procedures, which form the core of a number of management plans. Fisheries where such management plans appear successful include Northeast Arctic cod and haddock, North Sea herring, sole and plaice and most Icelandic fisheries. The harvest control rules have aided dialogue between industry (through, for example, the RACs) and ICES (through management plan evaluations). Even where management plans are not being implemented successfully, such as has been the case with NE mackerel, the harvest control rule still provides a clear way to measure management performance and a focus for improvement. 
+
+Another significant change that continues to be implemented is the EU landings obligation. This prohibits unnecessary discarding in line with policies already adopted by Iceland and Norway. These policies effectively require vessels to land all fish within quotas that they catch. In practice, it may discourage discarding, but in most cases, it is not enforceable at sea, so the full effect is unclear. A recent EU study  on the landings obligation concluded that control and enforcement was “challenging”, and that EU Member States had not adopted the necessary control measures and that significant undocumented discarding of catches still occur. It is likely that more extensive use of remote electronic monitoring at sea will be required, along with further incentives not to discard (e.g., improve value of the mixed catch). 
+
+In Iceland, the value of all catches has been enhanced by developing alternative products and markets. Raw material that was previously considered “fish waste” and discarded, such as fish livers and fish roes, are being utilized as much as possible. Fish viscera, heads, bones, swim-bladders and skin are all utilized to an increasing extent for a wide range of products, including enzymes, chitin, fish leather, omega fish oils and medical products. This is greatly helped by low geothermal energy costs for drying etc., but does suggest improvements in the post-harvest landings value could help fisheries where catches are being reduced to protect the stocks, and is widely used as an example of best practice more widely to other fisheries.
+
+# References
+
+The primary sources used for these assessments and evaluation was derived from ICES advice (Latest advice (ices.dk)).  
+
+Aguirre-Sarabia, I, et al. 2021. Evidence of stock connectivity, hybridization, and misidentification in white anglerfish supports the need of a genetics-informed fisheries management framework. Evolutionary Applications 14(9) https://doi.org/10.1111/eva.13278
+
+Aune M et al (2021) Distribution and ecology of polar cod (Boreogadus saida) in the eastern Barents Sea: a review of historical literature. Mar Environ Res 166:105262. https://doi.org/10.1016/j.marenvres.2021.105262
+
+Diekmann, R., and Möllmann, C. (Eds). (2010) Integrated ecosystem assessments of seven Baltic Sea areas covering the last three decades. ICES Cooperative Research Report No. 302. 90 pp.
+
+DNV 2018. Iceland Northern shrimp fishery (inshore and offshore). Marine Stewardship Council Public Certification Report.
+
+EU 2004. Council Decision of 19 July 2004 establishing Regional Advisory Councils under the Common Fisheries Policy (2004/585/EC). Official Journal of the European Union. 
+
+EU 2007. Council Decision of 11 June 2007 amending Decision 2004/585/EC establishing Regional Advisory Councils under the Common Fisheries Policy (2007/409/EC). Official Journal of the European Union. 
+
+FAO. 2023. Fishery and Aquaculture Statistics. Global capture production 1950-2021 (FishStatJ). In: FAO Fisheries and Aquaculture Division [online]. Rome. Updated 2023. www.fao.org/fishery/statistics/software/fishstatj/en
+
+Huserbråten MBO, Eriksen E, Gjøsæter H, Vikebø F. 2019. Polar cod in jeopardy under the retreating Arctic sea ice. Commun. Biol. 2019;2:1–8. doi: 10.1038/s42003-019-0649-2.
+
+Michalsen, K., P. Dalpadado, E. Eriksen, H. Gjøsæter, R.B. Ingvaldsen, E. Johannesen, L.L. Jørgensen, T. Knutsen, D. Prozorkevich, M. Skern-Mauritzen. 2013. Marine living resources of the Barents Sea – ecosystem understanding and monitoring in a climate change perspective. Mar. Biol. Res., 9 (2013), pp. 932-947
+
+WGBAST 2020. Baltic Salmon and Trout Assessment Working Group (WGBAST). ICES Scientific Reports. 2:22. 261 pp. http://doi.org/10.17895/ices.pub.5974
+
+WGCRAN. 2019. Report of the Working Group on Crangon Fisheries and Life History (WGCRAN), 9–11 October 2018, ICES Headquarters, Copenhagen, Denmark. ICES CM 2018/EPDSG:06. 68 pp. https://doi.org/10.17895/ices.pub.8105

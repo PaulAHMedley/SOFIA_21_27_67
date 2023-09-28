@@ -1,0 +1,974 @@
+---
+title: "Northeast Pacific"
+subtitle: "SOFIA Major Fishing Area 67"
+author: "Paul A Medley"
+date: "September 2023"
+toc: true
+number-sections: true
+editor: source
+format:
+  docx:
+    reference-doc: FAO-format-doc.docx
+execute:
+  echo: false
+  warning: false
+  fig-dpi: 400
+---
+
+
+```{r setup}
+#| include: false
+# Note that for the current version of Quarto 1.3.450 table captions and referencing does not work. 
+# The tables themselves are rendered OK.
+library("here")
+system2("powershell", args=c("Set-Content", "-Path", paste0(here(),"\\.Rproj.user"), "-Stream", "com.dropbox.ignored", "-Value", "1"))  # for dropbox users with RStudio projects only
+#library("remotes")
+#install_github("DanOvando/sraplus")
+#install.packages("TAF")
+#install_github("sofia-taf/SOFIA")
+library("sraplus")
+library("TAF")
+library("SOFIA")
+#library("officedown")  #possible use
+#library("officer")
+library("readxl")
+library("dplyr")
+library("tidyr")
+library("flextable")
+library("purrr")    # map, map_lgl, safely
+source(here("R", "SOFIA_function_library.R"))
+
+options(dplyr.summarise.inform=FALSE)
+
+SRA_res <- tibble()
+
+# Parameters
+area <- 67
+THISYEAR <- "2023"
+```
+
+
+
+```{r}
+#| include: false
+#| output: false
+
+# Stock assessment summary
+
+USA_SA_df <- readxl::read_xlsx(here("data", "FAOAreas_21_67.xlsx"), sheet=paste0("USA_SA_", THISYEAR)) |>
+  dplyr::select(ISSCAAP = `ISSCAAP Group`, `FAO Area`, Country, `Stock ID`, `Stock Name`,	
+                Jurisdiction, `Scientific Name`,	`Common Name`, `Stock Area`, 
+                `Assessment Year`,	Citation=`Final Assessment Report 1`, 
+                Weight_Type,	Weight,	Status, Score, Category, Notes)
+CAN_SA_df <- readxl::read_xlsx(here("data", "FAOAreas_21_67.xlsx"), sheet=paste0("Canada_SA_", THISYEAR)) |>
+  dplyr::select(ISSCAAP = `ISSCAAP Group`, `FAO Area`, Country, `Stock ID`, `Stock Name`,	
+                Jurisdiction, `Scientific Name`,	`Common Name`, `Stock Area`, 
+                `Assessment Year`,	Citation, 
+                Weight_Type, Weight,	Status, Score, Category, Notes)
+
+SA_df <- rbind(USA_SA_df, CAN_SA_df) |>
+  filter(`FAO Area` == area,
+         !is.na(Status)) |>
+  mutate(score_wt = Weight*Score)
+
+if (any(is.na(SA_df$Score) & SA_df$Status == "U")) {
+  filter(SA_df, is.na(Score), Status != "U")
+}
+```
+
+
+
+```{r}
+#| include: false
+#| output: false
+
+# FishStat total catch data
+
+df <- read.csv(file=here("data", "FishStat", "Capture_Quantity.csv"))
+country_df <- read.csv(file=here("data", "FishStat", "CL_FI_COUNTRY_GROUPS.csv"))
+species_df <- read.csv(file=here("data", "FishStat", "CL_FI_SPECIES_GROUPS.csv"))
+area_df <- read.csv(file=here("data", "FishStat", "CL_FI_WATERAREA_GROUPS.csv"))
+symbol_df <- read.csv(file=here("data", "FishStat", "CL_FI_SYMBOL.csv"))
+unit_df <- read.csv(file=here("data", "FishStat", "FSJ_UNIT.csv"))
+
+tc_df <- df |> filter(AREA.CODE==area) |>
+  arrange(PERIOD) |>
+  left_join(species_df, by=c("SPECIES.ALPHA_3_CODE"="X3A_Code")) |> 
+  dplyr::select(SPECIES.ALPHA_3_CODE:STATUS, Scientific_Name,
+                Name_En, Major_Group, 
+                ISSCAAP=ISSCAAP_Group_En)
+Last_Year <- max(tc_df$PERIOD)
+
+average_catch <- sum(filter(tc_df, MEASURE == "Q_tlw",
+                            (Major_Group %in% c("PISCES", "CRUSTACEA", "MOLLUSCA")),
+                            PERIOD > Last_Year-5)$VALUE)/5000000
+
+# 32-Cods, hakes, haddocks
+# 23-Salmons, trouts, smelts
+# 31-Flounders, halibuts, soles
+# 34-Miscellaneous demersal fishes
+# 35-Herrings, sardines, anchovies
+# 42-Crabs, sea-spiders
+# 33-Miscellaneous coastal fishes
+# 45-Shrimps, prawns
+# 44-King crabs, squat-lobsters
+
+main_ISSCAAP <- c(
+  "Cods, hakes, haddocks", "Salmons, trouts, smelts", 
+  "Flounders, halibuts, soles", "Miscellaneous demersal fishes", 
+  "Herrings, sardines, anchovies", "Crabs, sea-spiders",
+  "Miscellaneous coastal fishes", "Shrimps, prawns", 
+  "King crabs, squat-lobsters", "Others")
+secondary_ISSCAAP <- c("")
+
+rm(df, country_df, species_df, area_df, symbol_df, unit_df)
+```
+
+
+```{r eval=FALSE}
+#| include: false
+#| label: tbl-ISSCAAP_total_landings
+#| tbl-cap: "Total landings by ISCCAAP group for the entire period 1950-2021."
+
+tc_df |>
+  dplyr::group_by(ISSCAAP, MEASURE) |>
+  summarise(VALUE=sum(VALUE)) |>
+  select(ISSCAAP, VALUE, MEASURE) |>
+  arrange(desc(MEASURE), desc(VALUE)) |>
+  flextable() |>
+  autofit()
+
+```
+
+# Summary
+
+Stocks in Area 67 are managed by USA and Canada. The majority of the catch volume is taken in Alaskan waters. Overall, the assessment suggests a mixed picture, but in general most stocks are healthy  (Table 1), some having recovered from overfishing in 1960s-1990s.  
+
+In terms of catch volume and total value, the walleye (Alaskan) pollock fisheries in Alaska are a dominant fishery. Broadly, the status of these stocks is fully exploited. Otherwise, the larger fisheries are the mixed demersal trawl fisheries and salmon fisheries. Management interventions in all these fisheries has rapidly increased in recent decades and they now are performing better despite difficulties with managing a complex demersal mixture of species, including vulnerable rockfish, and the very large number of salmon stocks.
+
+  
+
+```{r}
+#| label: tbl-ISSCAAP_avg_scores
+#| tbl-cap: "Summary status across stocks by ISSCAAP based on scores (1=O, 2=F, 3=N) weighted by MSY (or a proxy for MSY) for stocks where status information is available."
+#| tbl-cap-location: top
+
+table_ISSCAAP_scores()
+
+```
+
+# Introduction  
+
+The Northeast Pacific FAO Area 67 comprises the marine waters bounded in the north and east by United States of America and Canada and in the northwest (eastern Gulf of Anadyr) by the Russian Federation (@fig-Area67Map). It covers almost 8 million km^2^, of which 1.3 million km^2^ are shelf area. Various physical oceanographic effects around the continental shelf area support increased nutrient levels that support concentrated biological processes and their associated abundant fish resources.
+
+Around 40 percent of marine waters are within national EEZs, and 60 percent in international waters. The majority of the fishing activity in these waters is from USA and Canada fleets (Iriondo et al. 2019).  
+
+In this region, there are two regional fisheries management organisations for tuna and five covering other shared resources:  
+
+•	The North Pacific Fisheries Commission (NPFC) is a recent regional fisheries management body founded in 2015, that manages shared resources in the high seas of both the East and West North Pacific. Relevant NE Pacific species include rockfishes and sablefish, but NPFC primarily supports national stock assessments for these.  
+
+•	There are two salmon organisations: Pacific Anadromous Fish Commission (NPAFC) includes Japan and South Korea and covers all main salmon species (Oncorhynchus spp.) across the North Pacific, whereas the Pacific Salmon Commission covers only USA and Canada shared stocks.  
+
+•	The Convention on the Conservation and Management of Pollock Resources in the Central Bering Sea (CCBSP) covers the shared walleye pollock stock in the central Bering Sea on which there is currently a fishing moratorium as it recovers.  
+
+•	International Pacific Halibut Commission (IPHC) is an international organization established by a Convention between Canada and the United States of America to manage the shared Pacific halibut stock.  
+
+The continental shelf of the Canadian area (British Columbia) is narrow, with  the majority of the coastal range and shelf being that that of Alaska. FAO Area 67 includes distinct large marine ecosystems of the California Current, the Gulf of Alaska and East Bering Sea. Wide areas are closed to demersal trawl fishing due to sensitive habitat including rocky areas, corals, anemones, kelp.  
+
+In terms of volume, walleye (Alaska) pollock is the dominant species. It represents largest proportion of the total landings with around 50% landings being walleye pollock over the period 2017-2021.  
+
+![The Northeast Pacific (Area 67)](MapArea67.png){#fig-Area67Map}
+
+
+
+# Estimating Stock Status  
+
+The assessments here use the Canadian and USA stock assessment report, and the assessment is therefore the same as that used for Area 21. However, unlike the Atlantic fisheries, data time series are generally shorter and industrial fisheries would not have been operating over such a long period. In terms of fishing activity and data, there was a critical period before EEZs were enforced when there was a lot of foreign fishing activity in what are now USA and Canadian waters. Among other things, these issues have affected the stock assessment approach with greater reliance on model-based reference points rather than more empirical ones.  
+
+Three very similar approaches are used in the region to define stock status. All approaches use Maximum Sustainable Yield (MSY) based reference points, although in many cases proxies are used are related to MSY concept, where precise estimation of MSY is not possible.  
+
+The approach used in the USA is usually based on integrated stock assessment models that incorporate a stock recruitment relationship as a paradigm rather than fitted empirically. This approach allows estimation of the stock size compared to an unexploited state even where that state is not observed. This is a reasonable approach in terms of decision-making, and justified where stock productivity has been steady over the available data time series. Where this is done and status is reported as a ratio compared to unexploited biomass, status can be determined relative to 20% SSB0, below which a stock is overexploited, and 60% SSB0, over which it is not fully exploited. Between these two reference levels, a stock is considered fully exploited. For these integrated approaches, the uncertainty of the status determination is low.  
+
+In practice, stock status is reported in terms of biomass at MSY, which is usually between 30-40% SSB~0~. References to SSB~0~ are not always available or used (for example, ICES – Area 27 – does not estimate SSB~0~ as it is a theorectical rather than empirical point and often cannot be determined). For consistency, the 20% SSB~0~ point is assumed to be B~lim~ if it is estimated or 50% B~MSY~ if B~MSY~ has been estimated. Stocks greater than 1.7 B~MSY~ are considered not fully exploited (1.7*35% ~ 60%).  
+
+Where a modelling approach is not possible, methods usually resort to index-based approaches. In these cases, there may be one or more indices that monitor either abundance or mortality, and reference points relative to MSY levels or MSY proxy levels can be proposed and used for decision-making. The USA has a requirement to monitor status to MSY, and therefore reference points are always couched in these terms. In Canada, they apply a “Precautionary Approach” method which sets a limit reference point (LRP) and an Upper Stock Reference (USR) point which define three zones along the abundance or biomass axis. The index-based approaches are effectively decision frameworks rather than providing definitive status information, so are designed to delivered long-term safe yields rather than ensure a stock is in a particular state. Nevertheless, the indices can be interpreted in terms of abundance status. To this end, a stock below the limit reference point might be considered at high risk of recruitment overfishing, which is the same intent as the LRP at 20% SSB0. If a stock is in this critical zone, it is considered overfished. Using this method in determining when a stock is not fully exploited is more difficult. The zone between the LRP and USR is the “cautious” zone, and effectively indicates a trigger point when management action may be required to avoid the stock falling below the LRP. As a result, it does not indicate that a stock is less than fully exploited. Unless there is specific evidence otherwise, I assume these stocks are fully rather than not-fully exploited. This is often supported by observing that many stocks are below or close to the USR or have dipped below the USR in the recent past.  
+
+There are a few stocks that are managed through advice from ICES and from NAFO. ICES applies its own approach (see Area 27 report), that is similar to the Canadian approach above but where possible is linked to explicit MSY references. However, ICES does not generally reference unexploited biomass states when determining status as it does not have a default stock-recruitment relationship. Where NAFO is dealing with its few stocks solely in international waters, they are data-limited and the advice is quite general but still indicates general status, but with higher uncertainty.  
+
+For the purposes of this evaluation, I treat integrated assessments and index-based assessments that have well-defined reference points, as both having low uncertainty. The index-based methods are in general more uncertain than integrated models as they depend on fewer sources of information on stock state. US fisheries advice has often adopted an index-based approach where the integrated model has been rejected in the independent review process. Index based methods are often difficult to evaluate and include more untestable assumptions, so will underestimate uncertainty. However, in some cases, particularly for sedentary shellfish, a survey can obtain a reasonable precautionary absolute abundance estimate and can base recommended harvest based on this. In general, other index-based methods have been broadly evaluated, and well-evaluated in some cases, such that they have been shown to be robust. Therefore, these differences in uncertainty are not sufficiently far apart to warrant different classification within the broad determinations in this review.  
+
+Where reference is made to groups of stocks and their average status, the mean of the status categories is used. This is a weight mean of the score within the group, where the ideal weight is the single species MSY. Using MSY captures the relative size of the stock and fishery regardless of whether the stock is over- or fully- or less-than-fully exploited. In many cases, MSY is not estimated, so some guesswork is applied based on past catches as to what a reasonable MSY might be. For example, if a stock is being fully exploited and has been around its target level in recent years, the MSY would likely be around recent catches during this period. In general, the results are not sensitive to this choice, the main objective being to capture large differences among the sizes of management units which would otherwise be ignored if an equal weighting is applied.
+
+# Resource Status  
+
+## Overview  
+
+Total marine captures have increased from an average of around 0.6 million tonnes in the 1950s to an average of around 2-3 million tonnes during the period 1970-2020. Many stocks do not have a long data time series and data recording to species level has been achieved for some species groups only in the later time period.  
+
+Within the total marine captures, the composition has become dominated by walleye (Alaskan) pollock.  
+
+Most of the fishery resources of the Northeast Pacific are fully exploited (@tbl-ISSCAAP_status_summary), but some remain not fully exploited yet and a few are in recovery. This is the nature f mixed fisheries, where it is not possible to harvest all stocks at a common target level (MSY).
+
+
+```{r }
+#| label: fig-ann_catch_67
+#| fig-cap: "Annual nominal landings (million t) by ISSCAAP species groups in the Northeast Pacific (Area 67)."
+#| fig-width: 5.7
+
+plot_total_ISSCAAP()
+
+```
+
+
+
+```{r}
+#| label: tbl-ISSCAAP_status_summary
+#| tbl-cap: "Stock status summary for not fully exploited (N), fully exploited (F), overfished (O) and unknown status (U). 'O-F' implies stocks are a mixture of fully exploited and overfished."
+#| tbl-cap-location: top
+
+table_ISSCAAP_status()
+
+```
+
+
+## 32-Cods, hakes, haddocks
+
+Catches of walleye (Alaskan) pollock dominate the catches in this region. Walleye pollock is an abundant semipelagic schooling fish found across the North Pacific. It is relatively easy to catch in large quantities at low cost, so is a major supplier to the white fish international markets. Other important are Pacific hake and Pacific cod which are used for similar purposes, but are more demersal.  
+
+In contrast to the North Atlantic, the stocks in the cod, hakes and haddock group are generally in healthy condition, but fully exploited. Most stock assessment focus has been on walleye pollock with directed surveys being an important component of the stock assessment process. Nevertheless, the Bogoslof and Gulf of Alaska stocks depend upon an index-based assessment which only provides relative exploitation advice. For Bogoslof, catches are currently set to zero due to uncertainty over the stock status. Other important stocks are Pacific hake and cod, all of which are considered fully exploited.
+
+  
+
+```{r}
+#| label: fig-ann_catch_67_32
+#| fig-cap: "ISSCAAP Group 32 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 32-Cods, hakes, haddocks
+
+ISSCAAP <- "Cods, hakes, haddocks"
+
+
+retain_groups <- c("Alaska pollock(=Walleye poll.)", "North Pacific hake",
+                   "Pacific cod", "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+
+
+```{r}
+#| label: tbl-32Stocks
+#| tbl-cap: "Cod, hake and haddock stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_32
+#| fig-cap: "ISSCAAP Group 32 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_32
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+
+## 23-Salmons, trouts, smelts
+
+Catches of salmons, trouts and smelts represent a significant proportion of landings in this area, with the most abundant stocks and catches in Alaska and declining salmon stock size as they move south. The species are associated with fresh and brackish water, they are predominantly managed locally within river basins. The anadromous lifecycle makes these stocks particularly dependent on coastal and riverine habitat which are often impacted by population and human development. Impacts of human development around Alaskan and other river systems is less than that found around the Atlantic, so salmon populations have been less effected. Many populations are also supported by hatcheries that release juvenile fish into the wild.  
+
+Catches are dominated by pink and sockeye salmon, which with chum salmon, are the most common species. Management of salmon is generally difficult because of the complex nature of their life history with a very large number of spawning components associated with different rivers and lakes. Salmon are also vulnerable to environmental effects on the riverine habitats so spawning success and survival is variable. Some sockeye salmon have no marine phase but spend their lives entirely in lakes and rivers.  
+
+However, data on important can be very accurate compared to other fisheries with direct counts of return spawners as they migrate upriver. While this may allow accurate monitoring of population size for some stocks, many have little information on their size, and mortality through their life history is still often not well understood, so appropriate reference points may still be difficult to estimate. The result is many have poor or no estimate of population status (@tbl-23Stocks). The primary concern is for salmon stocks in more southerly areas (California in particular), where populations in general are less productive and under greater pressure.
+
+
+```{r}
+#| label: fig-ann_catch_67_23
+#| fig-cap: "ISSCAAP Group 23 annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 23-Salmons, trouts, smelts
+
+ISSCAAP <- "Salmons, trouts, smelts"
+retain_groups <- c("Pink(=Humpback) salmon", "Sockeye(=Red) salmon",
+                   "Chum(=Keta=Dog) salmon", 
+                   "Coho(=Silver) salmon",
+                   "Chinook(=Spring=King) salmon",
+                   "Others")
+
+plot_ISSCAAP("Salmons, trouts, smelts", retain_groups)
+```
+
+
+
+```{r}
+#| label: tbl-23Stocks
+#| tbl-cap: "Salmons, trouts and smelts stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_23
+#| fig-cap: "ISSCAAP Group 23 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_23
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+
+## 31-Flounders, halibuts, soles
+
+A wide range of flatfish are taken in the demersal trawl fishery. Yellowfin sole, rock sole and flathead sole are desirable flatfish species and important components of the demersal trawl catch. Arrowtooth flounder is a common predator encountered by demersal trawl and taken as bycatch. The value of the fish is of low value, but improved treatment of the catch has increased its marketability.
+
+Pacific halibut is primarily taken in commercial fisheries using longline, but there is a recreational fishery. The stock is coastwide and the fishery is managed by the Pacific Halibut Commission which manages the USA and Canada fisheries that target this stock. There is an extensive data collection program to support the stock assessment, which currently indicates that the stock is fully exploited.
+
+
+```{r}
+#| label: fig-ann_catch_67_31
+#| fig-cap: "ISSCAAP Group 31 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 31-Flounders, halibuts, soles
+
+ISSCAAP <- "Flounders, halibuts, soles"
+retain_groups <- c("Yellowfin sole", 
+                   "Pacific halibut", 
+                   "Rock sole", 
+                   "Arrowtooth flounder", 
+                   "Flathead sole", 
+                   "Kamchatka flounder", 
+                   "Others")
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-31Stocks
+#| tbl-cap: "Flounders, halibuts and soles stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+retain_groups <- c("Yellowfin sole", 
+                   "Pacific halibut", 
+                   "Rock sole", 
+                   "Arrowtooth flounder", 
+                   "Flathead sole", 
+                   "Kamchatka flounder", 
+                   "Others")
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_31
+#| fig-cap: "ISSCAAP Group 31 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_31
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## 34-Miscellaneous demersal fishes
+
+The most important demersal species with respect to management are the rockfish (or redfish) (*Sebastes* spp.). This is a very diverse group of fish found across the region. While they are quite a valuable part of the catch, quantities caught are not large. However, most of these species are characterized by long life spans and viviparous spawning, both features of species vulnerable to fishing and some stocks have been depleted in the past. Current status is now mixed (@tbl-34Stocks) but generally has improved as management plans have been implemented. As well as quotas, the species that are associated with reefs also gain protection from areas closed to fishing to protect habitat. Even if not an important part of the catch, rockfish may still be a critical “choke” species stopping all fishing in a mixed fishery when their quota is reached, so managing these stocks is important.  
+
+Pacific Ocean perch (*Sebastes alutus*) is a semi-demersal species often found and caught off the seabed. Significant catches were taken in the 1960s by Russian and Japanese fleets depleting the stocks but they have since recovered and are now mostly fully exploited.  
+
+There is substantial market interest in sablefish and there is a longline as well as trawl fishery for these stocks. Stocks in Alaska, Southern USA and Canada are estimated to be in good condition.
+
+
+```{r}
+#| label: fig-ann_catch_67_34
+#| fig-cap: "ISSCAAP Group 34 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 34-Miscellaneous demersal fishes
+
+ISSCAAP <- "Miscellaneous demersal fishes"
+
+
+retain_groups <- c("Pacific ocean perch", 
+                   "Scorpionfishes, redfishes nei",
+                   "Sablefish", 
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-34Stocks
+#| tbl-cap: "Miscellaneous demersal fishes stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_34
+#| fig-cap: "ISSCAAP Group 34 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_34
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## 35-Herrings, sardines, anchovies
+
+As in the Atlantic, herring populations are made up of individual spawning components which may be separated in autumn and spring periods. There is likely some mixing of components but they can be managed often in groups as separate units. Herring was widely overfished and many components remain depleted. In general, fisheries do not exist anymore on these stocks so they are not assessed, although they may be monitored for conservation purposes. Of the stocks that are assessed, all in Canada, catches remain very low but are considered as effectively recovered.  
+
+Pacific sardine is considered still overfished and recovering, so there is effectively currently no fishery. A more southerly stock not considered here is shared between Areas 67 and 77, but predominantly in Area 77.
+
+```{r}
+#| label: fig-ann_catch_67_35
+#| fig-cap: "ISSCAAP Group 35 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 35-Herrings, sardines, anchovies
+
+ISSCAAP <- "Herrings, sardines, anchovies"
+
+
+retain_groups <- c("Pacific herring", 
+                   "Pacific sardine", 
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-35Stocks
+#| tbl-cap: "Herrings, sardines and anchovies stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_35
+#| fig-cap: "ISSCAAP Group 35 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_35
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## 42-Crabs, sea-spiders
+
+Tanner crabs (*Chionoecetes* sp.) are spider crabs and include queen (snow) crab as well as other species in trap fisheries particularly in Alaska. Although the average for this group suggests overfishing (@tbl-ISSCAAP_status_summary), this is driven  by the reported state for Bering Sea snow crab which is below its limit reference point. The other reported stocks appear in good condition, but these populations are small.  
+
+Dungeness crab is found coastwide, but managed by individual states as it is a coastal species. Most management is focused on trying to ensure sufficient crabs survive reproduce and prevent growth overfishing by applying minimum landing size regulations, harvesting males and applying seasonal closures rather than quotas. 
+
+Most stocks do not undergo regular stock assessments. For example, Dungeness crab in California is not regularly assessed because no connection can be found between stock size and recruitment and the population has fluctuated widely due to environmental effects rather than fishing. It is considered in a healthy state.
+
+```{r}
+#| label: fig-ann_catch_67_42
+#| fig-cap: "ISSCAAP Group 42 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 42-Crabs, sea-spiders
+
+ISSCAAP <- "Crabs, sea-spiders"
+
+retain_groups <- c("Tanner crabs nei", 
+                   "Queen crab",
+                   "Dungeness crab",  
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-42Stocks
+#| tbl-cap: "Crabs and sea-spiders stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_42
+#| fig-cap: "ISSCAAP Group 42 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_42
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## 33-Miscellaneous coastal fishes
+
+Atka mackerel is a greenling from the family Hexagrammidae rather than Scombridae. It supports recreational and commercial fisheries in Alaska and is considered fully exploited. Lingcod is from the same family and caught in both recreational and commercial fisheries, although in much smaller quantities. Of the identified stocks, two have been assessed in recent years. Catches have been declining recently, but the stocks were assessed as fully exploited.  
+
+```{r}
+#| label: fig-ann_catch_67_33
+#| fig-cap: "ISSCAAP Group 33 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 33-Miscellaneous coastal fishes
+
+ISSCAAP <- "Miscellaneous coastal fishes"
+
+retain_groups <- c("Atka mackerel", 
+                   "Lingcod",  
+                   "Grunts, sweetlips nei",
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+
+  
+
+```{r}
+#| label: tbl-33Stocks
+#| tbl-cap: "Miscellaneous coastal fishes stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_33
+#| fig-cap: "ISSCAAP Group 33 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_33
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## 45-Shrimps, prawns
+
+Landings across the region are mainly ocean (pink) shrimp (*Pandalus jordani*), but the fisheries are relatively diverse.  
+
+There are over 90 species of shrimp found in waters of British Columbia. Seven of these species of shrimp, belonging to the Family Pandalidae, are harvested by the shrimp trawl fishery off the Pacific Coast of Canada. The species are the Northern Pink (*Pandalus borealis eous*), Ocean or Smooth Pink Shrimp (*P. jordani*), Flexed Pink Shrimp (*P. goniurus*), Coonstripe Shrimp (*P. danae*), Humpback Shrimp (*P. hypsinotus*), Prawn or Spot Shrimp (*P. platyceros*), and Sidestripe Shrimp (*Pandalopsis dispar*). The fishery varies in complexity from single species harvest to multi-species harvest, although Pink and Sidestripe Shrimp are the main species targeted by the commercial trawl fleet.  
+
+Cold-water shrimp fisheries have no stock assessments reported for USA. The management focus has been on bycatch limits. The majority of USA landings are pink shrimp (*P. jordani*), but a large number of species are present in catches. Generally, stocks are considered at low risk of overfishing due to lower fishing effort compared to historical in many fisheries and are likely fully exploited.  
+
+
+```{r}
+#| label: fig-ann_catch_67_45
+#| fig-cap: "ISSCAAP Group 45 annual nominal catches (million t) in the Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 45-Shrimps, prawns
+ISSCAAP <- "Shrimps, prawns"
+retain_groups <- c("Ocean shrimp",
+                   "Spot shrimp",
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+  
+
+```{r}
+#| label: tbl-45Stocks
+#| tbl-cap: "Shrimps and prawns stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_45
+#| fig-cap: "ISSCAAP Group 45 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_45
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## 44-King crabs, squat-lobsters
+
+There are pot fisheries for three species of king crab, golden, blue and red king crab. Fisheries are managed through minimum landing size and males-only fishery with closed seasons. Catches for king have declined substantially from the 1960-1980s, and productivity of the stocks appears to be currently low.  
+
+The Norton Sound and Bristol Bay red king crab stocks are not overfished. Pribilof Islands and Saint Matthew Island blue king crab stocks are considered overfished based on survey results. For Pribilof Islands this was a large change in status from 2019, but is based on a survey biomass estimate and may be due to natural stock fluctuations. The Saint Mathew Island stock was estimated to be below its limit reference point, which is based on historical biomass levels. Catches have been at relatively low levels in these fisheries so overfishing is not thought to be occurring. Overall stock status is not well estimated and may change as more information becomes available.  
+
+Golden king crab appears to be in a better state than other stocks, with the status estimated close to the target levels. It is a deeper water species and probably had less attention in the early periods when overfishing occurred. 
+
+
+```{r}
+#| label: fig-ann_catch_67_44
+#| fig-cap: "ISSCAAP Group 44 Annual nominal catches (million t) of selected species in Northeast Pacific (Area 67). "
+#| width: 20cm
+
+# 44-King crabs, squat-lobsters
+
+ISSCAAP <- "King crabs, squat-lobsters"
+
+
+retain_groups <- c("King crab", 
+                   "Others")
+
+plot_ISSCAAP(ISSCAAP, retain_groups)
+```
+
+
+  
+
+```{r}
+#| label: tbl-44Stocks
+#| tbl-cap: "King crabs and squat-lobsters stock status in Area 67. (N - not fully exploited, F - fully exploited, O - overfished and U -unknown status)"
+
+table_stock_list(ISSCAAP)
+```
+
+  
+
+```{r}
+#| include: false
+stocks <- SRA_PrepareCatchData(retain_groups[-length(retain_groups)])
+priors <- read.taf(here("data", "priors67.csv"))
+stocks <- addDriors(stocks, priors, same.priors=TRUE)
+```
+
+
+```{r}
+#| label: fig-rel_catch_67_44
+#| fig-cap: "ISSCAAP Group 44 Relative catches of selected species in Northeast Pacific (Area 67). "
+#| fig-width: 5.7
+# Plot relative catch
+plot_relative_catch(stocks)
+```
+
+
+```{r}
+#| include: false
+#| output: false
+stocks <- SRA_fit_catchonly(ISSCAAP, stocks)
+```
+
+
+
+```{r}
+#| label: tbl-SRA_results_44
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments."
+res <- SRA_results(stocks)
+SRA_res <- rbind(SRA_res, res)
+SRA_table_results(res)
+```
+
+  
+  
+## Other Species
+
+@fig-ann_catch_67_other_ISSCAAP excludes invertebrates (other than molluscs and crustaceans), mammals and plants. Mammals are reported as number rather than weight and seaweeds are not a big component of the catch in Area 67. The “Others” group includes tunas and a substantial “unidentified fish” component, so decreases could represent improved reporting. 
+
+The main fish species group taken in fisheries in Area 67 is sharks and skates, and various shellfish.  
+
+Sharks and rays are vulnerable to overfishing because they are often viviparous and slow growing. They are subject to increased monitoring despite not being critical target species in the mixed fisheries because they may still limit fishing activity. Stocks include shark and skate multispecies complexes, big skate, longnose skate, Alaska skate and spiny dogfish stocks. All stocks in USA waters are either fully exploited or not yet fully exploited, in Canada their status is uncertain.  
+
+Many stocks of shellfish will not have formal stock assessments, with management relying of minimum landing size, closed seasons and other rules to prevent over-exploitation. Giant octopus from the Bering Sea / Aleutian Islands and British Columbia Pacific oyster are the only species having stock assessments in their respective groups. Giant octopus is probably not fully exploited, whereas the status of the Pacific oyster is uncertain. In Alaska, weathervane scallop  is probably not fully exploited, whereas the status of pink and spiny scallop in British Columbia is uncertain. From these individual stock assessments, it is difficult to generalise across all fisheries some of which are very small.  
+
+
+```{r}
+#| label: fig-ann_catch_67_other_ISSCAAP
+#| fig-cap: "Other ISSCAAP Groups’ annual nominal catches (million t) in the Northeast Pacific (Area 67). " 
+#| width: 20cm
+
+retain_groups <- c(
+  "Sharks, rays, chimaeras",
+  "Squids, cuttlefishes, octopuses",
+  "Clams, cockles, arkshells",
+  "Sea-urchins and other echinoderms",
+  "Oysters", 
+  "Scallops, pectens",
+  "Others")
+
+# Others include unidentified fish (largest amount historically) and tunas
+# Exclude "INVERTEBRATA AQUATICA" "PLANTAE AQUATICAE" "MAMMALIA" . Mammalia is counted. Seaweeds distorts weights.
+
+plot_others(retain_groups)
+```
+  
+# SRA Summary Results
+
+The SRA assessments used here are a naive catch-only assessment that does not use any other information.
+
+The priors might be improved. There is no fishlife match reported even when the species has life history parameters well estimated. This problem still needs to be resolved.
+
+The match between SRA and the stock assessments on a stock-by-stock basis is poor, but the general status of all stocks combined is better. SRA tends to imply more stocks are overfished, which is arguably more precautionary. In many cases, the status of stocks is unknown both for SRA and stock assessments available to this review.  
+
+
+```{r}
+#| label: tbl-SRA_results_summary
+#| tbl-cap: "Comparison between SRA results and averaged stock assessments overall."
+
+
+status_levels <- c("O", "O-F", "F", "N", "U")
+dummy_table <-  expand_grid(`SRA Status` = factor(status_levels), 
+                            `True Status`=factor(status_levels)) |>
+  mutate(count=0)
+
+res <- SRA_res |>
+  select(`SRA Status`, `True Status`) |>
+  replace_na(list(`True Status`="U")) |>
+  mutate(`SRA Status` = factor(`SRA Status`, levels = status_levels),
+         `True Status` = factor(`True Status`, levels = status_levels),
+         count = 1) |>
+  rbind(dummy_table) |>
+  group_by(`SRA Status`, `True Status`) |>
+  summarise(count = sum(count)) |>
+  ungroup()
+
+res |>
+  pivot_wider(names_from=`True Status`, values_from=count) |>
+  select(`SRA Status`, O, `O-F`, `F`, N, U) |>
+  flextable() |>
+  autofit()
+```
+
+
+```{r}
+#| label: tbl-SRA_results_summary2
+#| tbl-cap: "Marginal SRA status estimates compared to averaged stock assessments."
+
+rbind(
+  group_by(res, `SRA Status`) |>
+    summarise(count = sum(count)) |>
+    pivot_wider(names_from=`SRA Status`, values_from=count) |>
+    mutate(Source="SRA"),
+  group_by(res, `True Status`) |>
+    summarise(count = sum(count)) |>
+    pivot_wider(names_from=`True Status`, values_from=count) |>
+    mutate(Source="Stock Assessments")) |>
+  select(Source, everything()) |> 
+  flextable() |>
+  autofit()
+```
+
+
+
+
+# References  
+
+Links to the references for individual stock advice are available in the accompanying spreadsheet.  
+
+NOAA Fisheries. (2023). Assessment Summary Data. Retrieved from www.st.nmfs.noaa.gov/stocksmart. July 2023  
+
+Iriondo, A., Santiago, J., Murua, H., Granado, I., Taconet, M., Kroodsma, D., Miller, N. A., Fernandes, J. A. (2019). FAO Area 67 - AIS-based fishing activity in the Northeast Pacific. In Taconet, M., Kroodsma, D., Fernandes, J.A. (eds.) Global Atlas of AIS-based fishing activity - Challenges and opportunities. Rome, FAO. (also available at www.fao.org/documents/card/en/c/ca7012en)
+
