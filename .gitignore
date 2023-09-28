@@ -9,3 +9,6 @@ output
 .httr-oauth
 .DS_Store
 .quarto
+area21_*
+area27_*
+area67_*

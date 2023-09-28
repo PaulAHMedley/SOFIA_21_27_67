@@ -19,4 +19,6 @@ The intent is to use these reports to track changes in the stock assessments, bo
 
 The reports also contain some initial assessment using the SOFIA-TAF package. This uses the catch-only SRAplus model and the FishStat capture fishery data to assess the stock status for comparison with the the stock assessment summaries.  
 
-This is a work-in-progress and there are likely to be significant changes over the next few years (to 2025). 
+This is a work-in-progress and there are likely to be significant changes over the next few years (to 2025). The procedures have a number of unresolved issues. To limit the file size, the output directory which includes the SRA fits has not been included in the git repo. 
+
+contact: paulahmedley@gmail.com
