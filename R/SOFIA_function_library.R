@@ -98,12 +98,12 @@ SRA_results <- function(stocks) {
 }
 
 SRA_table_results <- function(current_status) {
-  tab <- current_status |>
+  return(current_status |>
     flextable() |>
     colformat_num(j=2, big.mark = "") |>
     colformat_double(j=3:5, digits = 3) |>
     align(j = 6:7, align = "center") |>
-    autofit()
+    autofit())
 }
 
 
